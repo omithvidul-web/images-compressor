@@ -73,9 +73,6 @@ export function UserMenu() {
               <MenuLink to="/admin" onSelect={() => setOpen(false)} icon="login">
                 Login
               </MenuLink>
-              <div className="px-3 py-2 text-[11px] text-muted-foreground">
-                Admin access only — for managing redirect links.
-              </div>
             </>
           ) : (
             <>
