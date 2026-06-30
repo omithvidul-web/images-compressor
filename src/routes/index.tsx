@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import logo from "@/assets/logo.png.asset.json";
 import { compressImage, formatBytes, type CompressResult } from "@/lib/compress";
 import { nextAdLink } from "@/lib/ads";
+import { UserMenu } from "@/components/UserMenu";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -147,6 +148,7 @@ function HomePage() {
           >
             {dark ? "☀ Light" : "☾ Dark"}
           </button>
+          <UserMenu />
         </div>
       </header>
 
