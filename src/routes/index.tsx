@@ -147,6 +147,7 @@ function HomePage() {
           >
             {dark ? "☀ Light" : "☾ Dark"}
           </button>
+          <UserMenu />
         </div>
       </header>
 
