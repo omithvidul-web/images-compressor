@@ -84,6 +84,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:description", content: "Compress JPG, PNG and WEBP images instantly in your browser. No upload, no signup." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
+      { name: "twitter:title", content: "Image Compressor — Fast, Free, Browser-Based" },
+      { name: "twitter:description", content: "Compress JPG, PNG and WEBP images instantly in your browser. No upload, no signup." },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/1da00e37-ffff-4ff6-a994-4432e07c069d" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/1da00e37-ffff-4ff6-a994-4432e07c069d" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
