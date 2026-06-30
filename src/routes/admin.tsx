@@ -59,10 +59,6 @@ function AdminPage() {
           </Link>
           <div className="glass-card brand-glow rounded-3xl p-8">
             <div className="brand-gradient mb-5 h-1 w-12 rounded-full" />
-            <h1 className="font-[Space_Grotesk] text-2xl font-bold">Admin access</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Sign in with the admin email to manage redirect links.
-            </p>
             <form onSubmit={onLogin} className="mt-6 space-y-3">
               <input
                 type="email"
