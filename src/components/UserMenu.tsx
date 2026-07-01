@@ -1,19 +1,20 @@
 import { Link, useRouter } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-
-const SESSION_KEY = "ic.admin.session";
+import { supabase } from "@/integrations/supabase/client";
+import { getAdminEmail } from "@/lib/ads";
 
 export function UserMenu() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [authed, setAuthed] = useState(false);
+  const [email, setEmail] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setAuthed(sessionStorage.getItem(SESSION_KEY) === "1");
-    const onStorage = () => setAuthed(sessionStorage.getItem(SESSION_KEY) === "1");
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? null));
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) =>
+      setEmail(session?.user?.email ?? null),
+    );
+    return () => sub.subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -25,9 +26,11 @@ export function UserMenu() {
     return () => document.removeEventListener("mousedown", onClick);
   }, [open]);
 
-  const signOut = () => {
-    sessionStorage.removeItem(SESSION_KEY);
-    setAuthed(false);
+  const isAdmin = !!email && email.toLowerCase() === getAdminEmail();
+  const authed = !!email;
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
     setOpen(false);
     router.navigate({ to: "/" });
   };
@@ -42,9 +45,7 @@ export function UserMenu() {
         className="brand-gradient flex h-9 w-9 items-center justify-center rounded-full text-white shadow-md transition hover:brightness-110"
       >
         {authed ? (
-          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-          </svg>
+          <span className="text-xs font-bold">{email!.charAt(0).toUpperCase()}</span>
         ) : (
           <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="12" cy="8" r="3.5" />
@@ -56,29 +57,34 @@ export function UserMenu() {
       {open && (
         <div
           role="menu"
-          className="glass-card brand-glow absolute right-0 z-50 mt-2 w-60 overflow-hidden rounded-2xl p-1.5 text-sm shadow-xl"
+          className="glass-card brand-glow absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-2xl p-1.5 text-sm shadow-xl"
         >
           <div className="px-3 py-2.5">
             <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-              {authed ? "Signed in" : "Account"}
+              {authed ? (isAdmin ? "Admin" : "Signed in") : "Account"}
             </div>
             <div className="mt-0.5 truncate text-sm font-semibold">
-              {authed ? "Admin" : "Guest"}
+              {authed ? email : "Guest"}
             </div>
           </div>
           <div className="my-1 h-px bg-border/70" />
 
           {!authed ? (
             <>
-              <MenuLink to="/admin" onSelect={() => setOpen(false)} icon="login">
+              <MenuLink to="/auth" onSelect={() => setOpen(false)} icon="login">
                 Login
+              </MenuLink>
+              <MenuLink to="/auth" onSelect={() => setOpen(false)} icon="dash">
+                Create account
               </MenuLink>
             </>
           ) : (
             <>
-              <MenuLink to="/admin" onSelect={() => setOpen(false)} icon="dash">
-                Admin dashboard
-              </MenuLink>
+              {isAdmin && (
+                <MenuLink to="/admin" onSelect={() => setOpen(false)} icon="dash">
+                  Admin dashboard
+                </MenuLink>
+              )}
               <button
                 role="menuitem"
                 onClick={signOut}

@@ -1,98 +1,109 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
   type AdLink,
   getAdminEmail,
-  getAdminPassword,
   getLinks,
   getSettings,
   saveLinks,
   saveSettings,
-  setAdminPassword,
 } from "@/lib/ads";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({ meta: [{ title: "Admin · Image Compressor" }, { name: "robots", content: "noindex" }] }),
   component: AdminPage,
 });
 
-const SESSION_KEY = "ic.admin.session";
+type State =
+  | { kind: "loading" }
+  | { kind: "signed-out" }
+  | { kind: "not-admin"; email: string }
+  | { kind: "admin"; email: string };
 
 function AdminPage() {
-  const [authed, setAuthed] = useState(false);
-  const [email, setEmail] = useState("");
-  const [pw, setPw] = useState("");
-  const [error, setError] = useState("");
+  const router = useRouter();
+  const [state, setState] = useState<State>({ kind: "loading" });
 
   useEffect(() => {
-    if (sessionStorage.getItem(SESSION_KEY) === "1") setAuthed(true);
+    const evaluate = (email: string | null | undefined) => {
+      if (!email) setState({ kind: "signed-out" });
+      else if (email.toLowerCase() === getAdminEmail())
+        setState({ kind: "admin", email });
+      else setState({ kind: "not-admin", email });
+    };
+
+    supabase.auth.getUser().then(({ data }) => evaluate(data.user?.email));
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) =>
+      evaluate(session?.user?.email),
+    );
+    return () => sub.subscription.unsubscribe();
   }, []);
 
-  const onLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    if (email.trim().toLowerCase() !== getAdminEmail()) {
-      setError("Access denied.");
-      return;
-    }
-    const stored = getAdminPassword();
-    if (stored == null) {
-      if (pw.length < 4) {
-        setError("Choose a password (4+ chars) to set up admin access.");
-        return;
-      }
-      setAdminPassword(pw);
-    } else if (stored !== pw) {
-      setError("Incorrect password.");
-      return;
-    }
-    sessionStorage.setItem(SESSION_KEY, "1");
-    setAuthed(true);
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    setState({ kind: "signed-out" });
   };
 
-  if (!authed) {
+  if (state.kind === "loading") {
+    return <div className="min-h-screen bg-background" />;
+  }
+
+  if (state.kind === "signed-out") {
     return (
-      <div className="min-h-screen bg-background text-foreground">
-        <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
-          <Link to="/" className="mb-8 text-xs text-muted-foreground hover:text-foreground">
-            ← Back to site
-          </Link>
-          <div className="glass-card brand-glow rounded-3xl p-8">
-            <div className="brand-gradient mb-5 h-1 w-12 rounded-full" />
-            <form onSubmit={onLogin} className="mt-6 space-y-3">
-              <input
-                type="email"
-                placeholder="Email"
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-xl border border-border bg-card px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500/60"
-              />
-              <input
-                type="password"
-                placeholder={getAdminPassword() ? "Password" : "Create a password"}
-                value={pw}
-                onChange={(e) => setPw(e.target.value)}
-                className="w-full rounded-xl border border-border bg-card px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500/60"
-              />
-              {error && <div className="text-xs text-destructive">{error}</div>}
-              <button
-                type="submit"
-                className="brand-gradient w-full rounded-xl px-4 py-3 text-sm font-semibold text-white shadow"
-              >
-                {getAdminPassword() ? "Sign in" : "Set password & sign in"}
-              </button>
-            </form>
-          </div>
-        </div>
-      </div>
+      <Gate>
+        <p className="mb-4 text-sm text-muted-foreground">
+          Sign in to continue.
+        </p>
+        <button
+          onClick={() => router.navigate({ to: "/auth" })}
+          className="brand-gradient w-full rounded-xl px-4 py-3 text-sm font-semibold text-white shadow"
+        >
+          Go to sign in
+        </button>
+      </Gate>
     );
   }
 
-  return <Dashboard onLogout={() => { sessionStorage.removeItem(SESSION_KEY); setAuthed(false); }} />;
+  if (state.kind === "not-admin") {
+    return (
+      <Gate>
+        <p className="mb-2 text-sm">
+          Signed in as <span className="font-medium">{state.email}</span>
+        </p>
+        <p className="mb-4 text-sm text-destructive">
+          This account does not have admin access.
+        </p>
+        <button
+          onClick={signOut}
+          className="w-full rounded-xl border border-border px-4 py-3 text-sm font-semibold hover:bg-secondary"
+        >
+          Sign out
+        </button>
+      </Gate>
+    );
+  }
+
+  return <Dashboard email={state.email} onLogout={signOut} />;
 }
 
-function Dashboard({ onLogout }: { onLogout: () => void }) {
+function Gate({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
+        <Link to="/" className="mb-8 text-xs text-muted-foreground hover:text-foreground">
+          ← Back to site
+        </Link>
+        <div className="glass-card brand-glow rounded-3xl p-8">
+          <div className="brand-gradient mb-5 h-1 w-12 rounded-full" />
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Dashboard({ email, onLogout }: { email: string; onLogout: () => void }) {
   const [links, setLinks] = useState<AdLink[]>([]);
   const [settings, setSettings] = useState(getSettings());
   const [label, setLabel] = useState("");
@@ -142,7 +153,9 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       <main className="mx-auto max-w-4xl space-y-6 px-5 pb-20">
         <div>
           <h1 className="font-[Space_Grotesk] text-3xl font-bold">Admin</h1>
-          <p className="text-sm text-muted-foreground">Manage Adsterra redirect links and download behavior.</p>
+          <p className="text-sm text-muted-foreground">
+            Signed in as <span className="font-medium">{email}</span>
+          </p>
         </div>
 
         {/* Global settings */}
