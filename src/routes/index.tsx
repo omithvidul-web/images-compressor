@@ -182,11 +182,16 @@ function HomePage() {
         >
           <div className="absolute inset-x-0 top-0 h-1 brand-gradient" />
           <div className="flex flex-col items-center text-center">
-            <div className="brand-gradient mb-4 flex h-16 w-16 items-center justify-center rounded-2xl shadow-lg">
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              aria-label="Select images"
+              className="brand-gradient mb-4 flex h-16 w-16 items-center justify-center rounded-2xl shadow-lg transition hover:brightness-110 active:scale-[0.98] cursor-pointer"
+            >
               <svg viewBox="0 0 24 24" className="h-8 w-8 text-white" fill="none" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 16V4m0 0l-4 4m4-4l4 4M4 20h16" />
               </svg>
-            </div>
+            </button>
             <h2 className="text-lg font-semibold sm:text-xl">Drop images here</h2>
             <p className="mt-1 text-sm text-muted-foreground">or tap to choose from your device</p>
             <button
