@@ -1,20 +1,19 @@
 import { Link, useRouter } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { getAdminEmail } from "@/lib/ads";
+
+const SESSION_KEY = "ic.admin.session";
 
 export function UserMenu() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [email, setEmail] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? null));
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) =>
-      setEmail(session?.user?.email ?? null),
-    );
-    return () => sub.subscription.unsubscribe();
+    const read = () => setIsAdmin(sessionStorage.getItem(SESSION_KEY) === "1");
+    read();
+    window.addEventListener("storage", read);
+    return () => window.removeEventListener("storage", read);
   }, []);
 
   useEffect(() => {
@@ -26,11 +25,9 @@ export function UserMenu() {
     return () => document.removeEventListener("mousedown", onClick);
   }, [open]);
 
-  const isAdmin = !!email && email.toLowerCase() === getAdminEmail();
-  const authed = !!email;
-
-  const signOut = async () => {
-    await supabase.auth.signOut();
+  const signOut = () => {
+    sessionStorage.removeItem(SESSION_KEY);
+    setIsAdmin(false);
     setOpen(false);
     router.navigate({ to: "/" });
   };
@@ -44,47 +41,38 @@ export function UserMenu() {
         aria-expanded={open}
         className="brand-gradient flex h-9 w-9 items-center justify-center rounded-full text-white shadow-md transition hover:brightness-110"
       >
-        {authed ? (
-          <span className="text-xs font-bold">{email!.charAt(0).toUpperCase()}</span>
-        ) : (
-          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="8" r="3.5" />
-            <path strokeLinecap="round" d="M4.5 20a7.5 7.5 0 0115 0" />
-          </svg>
-        )}
+        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="12" cy="8" r="3.5" />
+          <path strokeLinecap="round" d="M4.5 20a7.5 7.5 0 0115 0" />
+        </svg>
       </button>
 
       {open && (
         <div
           role="menu"
-          className="glass-card brand-glow absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-2xl p-1.5 text-sm shadow-xl"
+          className="glass-card brand-glow absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-2xl p-1.5 text-sm shadow-xl"
         >
-          <div className="px-3 py-2.5">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-              {authed ? (isAdmin ? "Admin" : "Signed in") : "Account"}
-            </div>
-            <div className="mt-0.5 truncate text-sm font-semibold">
-              {authed ? email : "Guest"}
-            </div>
-          </div>
-          <div className="my-1 h-px bg-border/70" />
-
-          {!authed ? (
-            <>
-              <MenuLink to="/auth" onSelect={() => setOpen(false)} icon="login">
-                Login
-              </MenuLink>
-              <MenuLink to="/auth" onSelect={() => setOpen(false)} icon="dash">
-                Create account
-              </MenuLink>
-            </>
+          {!isAdmin ? (
+            <Link
+              to="/auth"
+              onClick={() => setOpen(false)}
+              role="menuitem"
+              className="flex items-center gap-2.5 rounded-xl px-3 py-2 font-medium transition hover:bg-secondary"
+            >
+              <Icon name="login" />
+              Login
+            </Link>
           ) : (
             <>
-              {isAdmin && (
-                <MenuLink to="/admin" onSelect={() => setOpen(false)} icon="dash">
-                  Admin dashboard
-                </MenuLink>
-              )}
+              <Link
+                to="/admin"
+                onClick={() => setOpen(false)}
+                role="menuitem"
+                className="flex items-center gap-2.5 rounded-xl px-3 py-2 font-medium transition hover:bg-secondary"
+              >
+                <Icon name="dash" />
+                Admin dashboard
+              </Link>
               <button
                 role="menuitem"
                 onClick={signOut}
@@ -98,30 +86,6 @@ export function UserMenu() {
         </div>
       )}
     </div>
-  );
-}
-
-function MenuLink({
-  to,
-  onSelect,
-  icon,
-  children,
-}: {
-  to: string;
-  onSelect: () => void;
-  icon: IconName;
-  children: React.ReactNode;
-}) {
-  return (
-    <Link
-      to={to}
-      onClick={onSelect}
-      role="menuitem"
-      className="flex items-center gap-2.5 rounded-xl px-3 py-2 font-medium transition hover:bg-secondary"
-    >
-      <Icon name={icon} />
-      {children}
-    </Link>
   );
 }
 
