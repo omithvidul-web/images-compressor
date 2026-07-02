@@ -2,108 +2,62 @@ import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
   type AdLink,
-  getAdminEmail,
   getLinks,
   getSettings,
   saveLinks,
   saveSettings,
 } from "@/lib/ads";
-import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({ meta: [{ title: "Admin · Image Compressor" }, { name: "robots", content: "noindex" }] }),
   component: AdminPage,
 });
 
-type State =
-  | { kind: "loading" }
-  | { kind: "signed-out" }
-  | { kind: "not-admin"; email: string }
-  | { kind: "admin"; email: string };
+const SESSION_KEY = "ic.admin.session";
 
 function AdminPage() {
   const router = useRouter();
-  const [state, setState] = useState<State>({ kind: "loading" });
+  const [ready, setReady] = useState(false);
+  const [authed, setAuthed] = useState(false);
 
   useEffect(() => {
-    const evaluate = (email: string | null | undefined) => {
-      if (!email) setState({ kind: "signed-out" });
-      else if (email.toLowerCase() === getAdminEmail())
-        setState({ kind: "admin", email });
-      else setState({ kind: "not-admin", email });
-    };
-
-    supabase.auth.getUser().then(({ data }) => evaluate(data.user?.email));
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) =>
-      evaluate(session?.user?.email),
-    );
-    return () => sub.subscription.unsubscribe();
+    setAuthed(sessionStorage.getItem(SESSION_KEY) === "1");
+    setReady(true);
   }, []);
 
-  const signOut = async () => {
-    await supabase.auth.signOut();
-    setState({ kind: "signed-out" });
+  const signOut = () => {
+    sessionStorage.removeItem(SESSION_KEY);
+    router.navigate({ to: "/" });
   };
 
-  if (state.kind === "loading") {
-    return <div className="min-h-screen bg-background" />;
-  }
+  if (!ready) return <div className="min-h-screen bg-background" />;
 
-  if (state.kind === "signed-out") {
+  if (!authed) {
     return (
-      <Gate>
-        <p className="mb-4 text-sm text-muted-foreground">
-          Sign in to continue.
-        </p>
-        <button
-          onClick={() => router.navigate({ to: "/auth" })}
-          className="brand-gradient w-full rounded-xl px-4 py-3 text-sm font-semibold text-white shadow"
-        >
-          Go to sign in
-        </button>
-      </Gate>
-    );
-  }
-
-  if (state.kind === "not-admin") {
-    return (
-      <Gate>
-        <p className="mb-2 text-sm">
-          Signed in as <span className="font-medium">{state.email}</span>
-        </p>
-        <p className="mb-4 text-sm text-destructive">
-          This account does not have admin access.
-        </p>
-        <button
-          onClick={signOut}
-          className="w-full rounded-xl border border-border px-4 py-3 text-sm font-semibold hover:bg-secondary"
-        >
-          Sign out
-        </button>
-      </Gate>
-    );
-  }
-
-  return <Dashboard email={state.email} onLogout={signOut} />;
-}
-
-function Gate({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
-        <Link to="/" className="mb-8 text-xs text-muted-foreground hover:text-foreground">
-          ← Back to site
-        </Link>
-        <div className="glass-card brand-glow rounded-3xl p-8">
-          <div className="brand-gradient mb-5 h-1 w-12 rounded-full" />
-          {children}
+      <div className="min-h-screen bg-background text-foreground">
+        <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
+          <Link to="/" className="mb-8 text-xs text-muted-foreground hover:text-foreground">
+            ← Back to site
+          </Link>
+          <div className="glass-card brand-glow rounded-3xl p-8">
+            <div className="brand-gradient mb-5 h-1 w-12 rounded-full" />
+            <p className="mb-4 text-sm text-muted-foreground">Sign in to continue.</p>
+            <button
+              onClick={() => router.navigate({ to: "/auth" })}
+              className="brand-gradient w-full rounded-xl px-4 py-3 text-sm font-semibold text-white shadow"
+            >
+              Go to sign in
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  return <Dashboard onLogout={signOut} />;
 }
 
-function Dashboard({ email, onLogout }: { email: string; onLogout: () => void }) {
+function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [links, setLinks] = useState<AdLink[]>([]);
   const [settings, setSettings] = useState(getSettings());
   const [label, setLabel] = useState("");
@@ -153,12 +107,8 @@ function Dashboard({ email, onLogout }: { email: string; onLogout: () => void })
       <main className="mx-auto max-w-4xl space-y-6 px-5 pb-20">
         <div>
           <h1 className="font-[Space_Grotesk] text-3xl font-bold">Admin</h1>
-          <p className="text-sm text-muted-foreground">
-            Signed in as <span className="font-medium">{email}</span>
-          </p>
         </div>
 
-        {/* Global settings */}
         <section className="glass-card rounded-2xl p-5">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Global settings
@@ -189,7 +139,6 @@ function Dashboard({ email, onLogout }: { email: string; onLogout: () => void })
           </div>
         </section>
 
-        {/* Add link */}
         <section className="glass-card rounded-2xl p-5">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Add Adsterra link
@@ -213,7 +162,6 @@ function Dashboard({ email, onLogout }: { email: string; onLogout: () => void })
           </form>
         </section>
 
-        {/* Links list */}
         <section className="glass-card rounded-2xl p-5">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
             Links ({links.length})
