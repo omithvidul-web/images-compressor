@@ -27,6 +27,7 @@ export const Route = createFileRoute("/")({
 type Item = {
   id: string;
   file: File;
+  previewUrl: string;
   status: "pending" | "compressing" | "done" | "error";
   result?: CompressResult;
   error?: string;
@@ -66,6 +67,7 @@ function HomePage() {
       const newItems: Item[] = arr.map((f) => ({
         id: crypto.randomUUID(),
         file: f,
+        previewUrl: URL.createObjectURL(f),
         status: "pending",
       }));
       setItems((p) => [...newItems, ...p]);
@@ -327,11 +329,14 @@ function ResultCard({ item, onDownload }: { item: Item; onDownload: () => void }
   return (
     <div className="glass-card overflow-hidden rounded-2xl">
       <div className="grid gap-0 sm:grid-cols-[160px_1fr_auto] sm:items-center">
-        <div className="aspect-square w-full bg-secondary/50 sm:h-full sm:w-40">
-          {r ? (
-            <img src={r.url} alt={item.file.name} className="h-full w-full object-cover" />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
+        <div className="relative aspect-square w-full bg-secondary/50 sm:h-full sm:w-40">
+          <img
+            src={r?.url ?? item.previewUrl}
+            alt={item.file.name}
+            className="h-full w-full object-cover"
+          />
+          {!r && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/30 text-xs text-white">
               {item.status === "compressing" ? (
                 <Spinner />
               ) : item.status === "error" ? (
@@ -366,8 +371,10 @@ function ResultCard({ item, onDownload }: { item: Item; onDownload: () => void }
           ) : item.status === "error" ? (
             <div className="mt-1 text-xs text-destructive">{item.error}</div>
           ) : (
-            <div className="mt-1 text-xs text-muted-foreground">
-              {item.status === "compressing" ? "Compressing…" : "Waiting…"}
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">{formatBytes(item.file.size)}</span>
+              <span>·</span>
+              <span>{item.status === "compressing" ? "Compressing…" : "Waiting…"}</span>
             </div>
           )}
         </div>
