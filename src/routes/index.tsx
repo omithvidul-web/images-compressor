@@ -67,6 +67,7 @@ function HomePage() {
       const newItems: Item[] = arr.map((f) => ({
         id: crypto.randomUUID(),
         file: f,
+        previewUrl: URL.createObjectURL(f),
         status: "pending",
       }));
       setItems((p) => [...newItems, ...p]);
