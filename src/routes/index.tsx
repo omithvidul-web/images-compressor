@@ -27,6 +27,7 @@ export const Route = createFileRoute("/")({
 type Item = {
   id: string;
   file: File;
+  previewUrl: string;
   status: "pending" | "compressing" | "done" | "error";
   result?: CompressResult;
   error?: string;
