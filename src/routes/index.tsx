@@ -1,8 +1,7 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useCallback, useEffect, useRef, useState } from "react";
 import logo from "@/assets/logo.png.asset.json";
-import { compressImage, formatBytes, type CompressResult } from "@/lib/compress";
-import { nextAdLink } from "@/lib/ads";
+import { setPendingFiles } from "@/lib/previewStore";
 import { UserMenu } from "@/components/UserMenu";
 
 export const Route = createFileRoute("/")({
