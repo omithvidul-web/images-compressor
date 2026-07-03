@@ -23,27 +23,8 @@ export const Route = createFileRoute("/")({
   component: HomePage,
 });
 
-type Item = {
-  id: string;
-  file: File;
-  previewUrl: string;
-  status: "pending" | "compressing" | "done" | "error";
-  result?: CompressResult;
-  error?: string;
-};
-
-const PRESETS = {
-  low: { label: "Low", q: 0.4 },
-  medium: { label: "Medium", q: 0.7 },
-  high: { label: "High", q: 0.9 },
-} as const;
-
-type PresetKey = keyof typeof PRESETS;
-
 function HomePage() {
-  const [items, setItems] = useState<Item[]>([]);
-  const [preset, setPreset] = useState<PresetKey>("medium");
-  const [quality, setQuality] = useState(70);
+  const navigate = useNavigate();
   const [dark, setDark] = useState(false);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -54,45 +35,14 @@ function HomePage() {
     else root.classList.remove("dark");
   }, [dark]);
 
-  const onPickPreset = (k: PresetKey) => {
-    setPreset(k);
-    setQuality(Math.round(PRESETS[k].q * 100));
-  };
-
   const addFiles = useCallback(
-    async (files: FileList | File[]) => {
+    (files: FileList | File[]) => {
       const arr = Array.from(files).filter((f) => /image\/(jpeg|jpg|png|webp)/.test(f.type));
       if (!arr.length) return;
-      const newItems: Item[] = arr.map((f) => ({
-        id: crypto.randomUUID(),
-        file: f,
-        previewUrl: URL.createObjectURL(f),
-        status: "pending",
-      }));
-      setItems((p) => [...newItems, ...p]);
-
-      for (const it of newItems) {
-        setItems((p) => p.map((x) => (x.id === it.id ? { ...x, status: "compressing" } : x)));
-        try {
-          const outputType = it.file.type === "image/png" ? "image/png" : "image/jpeg";
-          // For PNG we still output JPEG for meaningful savings unless quality high
-          const finalType =
-            it.file.type === "image/webp" ? "image/webp" : outputType === "image/png" ? "image/jpeg" : "image/jpeg";
-          const result = await compressImage(it.file, {
-            quality: quality / 100,
-            outputType: finalType as "image/jpeg" | "image/webp",
-          });
-          setItems((p) => p.map((x) => (x.id === it.id ? { ...x, status: "done", result } : x)));
-        } catch (e) {
-          setItems((p) =>
-            p.map((x) =>
-              x.id === it.id ? { ...x, status: "error", error: (e as Error).message } : x,
-            ),
-          );
-        }
-      }
+      setPendingFiles(arr);
+      navigate({ to: "/preview" });
     },
-    [quality],
+    [navigate],
   );
 
   const onDrop = (e: React.DragEvent) => {
@@ -100,27 +50,6 @@ function HomePage() {
     setDragging(false);
     if (e.dataTransfer.files?.length) addFiles(e.dataTransfer.files);
   };
-
-  const handleDownload = (item: Item) => {
-    if (!item.result) return;
-    const ad = nextAdLink();
-    if (ad) {
-      window.open(ad.url, "_blank", "noopener,noreferrer");
-    }
-    const a = document.createElement("a");
-    a.href = item.result.url;
-    a.download = item.result.filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  };
-
-  const stats = useMemo(() => {
-    const done = items.filter((i) => i.result);
-    const orig = done.reduce((s, i) => s + (i.result?.originalSize ?? 0), 0);
-    const comp = done.reduce((s, i) => s + (i.result?.compressedSize ?? 0), 0);
-    return { count: done.length, orig, comp, saved: orig > 0 ? Math.round((1 - comp / orig) * 100) : 0 };
-  }, [items]);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -164,8 +93,7 @@ function HomePage() {
             <span className="brand-gradient-text">without losing the magic.</span>
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-sm text-muted-foreground sm:text-base">
-            Drop JPG, PNG or WEBP files. Pick a quality. Download a smaller version in seconds — right from
-            your browser.
+            Drop JPG, PNG or WEBP files. Preview the optimized version, then download — right from your browser.
           </p>
         </section>
 
@@ -211,70 +139,7 @@ function HomePage() {
             />
             <p className="mt-3 text-[11px] text-muted-foreground">JPG · PNG · WEBP — up to ~25MB each</p>
           </div>
-
-          {/* Quality controls */}
-          <div className="mt-8 grid gap-4 border-t border-border/60 pt-6 sm:grid-cols-[1fr_auto] sm:items-end">
-            <div>
-              <div className="mb-2 flex items-center justify-between">
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Quality
-                </label>
-                <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-semibold tabular-nums">
-                  {quality}%
-                </span>
-              </div>
-              <input
-                type="range"
-                min={5}
-                max={100}
-                value={quality}
-                onChange={(e) => setQuality(Number(e.target.value))}
-                className="w-full accent-blue-600"
-              />
-            </div>
-            <div className="flex gap-1.5 rounded-full bg-secondary p-1">
-              {(Object.keys(PRESETS) as PresetKey[]).map((k) => (
-                <button
-                  key={k}
-                  onClick={() => onPickPreset(k)}
-                  className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
-                    preset === k && Math.round(PRESETS[k].q * 100) === quality
-                      ? "brand-gradient text-white shadow"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {PRESETS[k].label}
-                </button>
-              ))}
-            </div>
-          </div>
         </section>
-
-        {/* Stats */}
-        {stats.count > 0 && (
-          <section className="mt-6 grid grid-cols-3 gap-3 sm:gap-4">
-            <StatCard label="Files" value={stats.count.toString()} />
-            <StatCard label="Original" value={formatBytes(stats.orig)} />
-            <StatCard
-              label="Saved"
-              value={`${stats.saved}%`}
-              accent
-              sub={`${formatBytes(stats.orig - stats.comp)}`}
-            />
-          </section>
-        )}
-
-        {/* Results */}
-        {items.length > 0 && (
-          <section className="mt-8 space-y-4">
-            <h3 className="font-[Space_Grotesk] text-lg font-bold">Your images</h3>
-            <div className="grid gap-4">
-              {items.map((it) => (
-                <ResultCard key={it.id} item={it} onDownload={() => handleDownload(it)} />
-              ))}
-            </div>
-          </section>
-        )}
 
         {/* Features strip */}
         <section className="mt-16 grid gap-4 sm:grid-cols-3">
@@ -296,106 +161,5 @@ function HomePage() {
         © {new Date().getFullYear()} Image Compressor · Built with care
       </footer>
     </div>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  sub,
-  accent,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  accent?: boolean;
-}) {
-  return (
-    <div className={`glass-card rounded-2xl p-4 ${accent ? "brand-glow" : ""}`}>
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-        {label}
-      </div>
-      <div className={`mt-1 text-xl font-bold tabular-nums sm:text-2xl ${accent ? "brand-gradient-text" : ""}`}>
-        {value}
-      </div>
-      {sub && <div className="text-[11px] text-muted-foreground">{sub}</div>}
-    </div>
-  );
-}
-
-function ResultCard({ item, onDownload }: { item: Item; onDownload: () => void }) {
-  const r = item.result;
-  return (
-    <div className="glass-card overflow-hidden rounded-2xl">
-      <div className="grid gap-0 sm:grid-cols-[160px_1fr_auto] sm:items-center">
-        <div className="relative aspect-square w-full bg-secondary/50 sm:h-full sm:w-40">
-          <img
-            src={r?.url ?? item.previewUrl}
-            alt={item.file.name}
-            className="h-full w-full object-cover"
-          />
-          {!r && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/30 text-xs text-white">
-              {item.status === "compressing" ? (
-                <Spinner />
-              ) : item.status === "error" ? (
-                "Failed"
-              ) : (
-                "Queued"
-              )}
-            </div>
-          )}
-        </div>
-        <div className="p-4">
-          <div className="truncate text-sm font-semibold">{item.file.name}</div>
-          {r ? (
-            <>
-              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                <span>{r.width}×{r.height}</span>
-                <span>·</span>
-                <span className="line-through">{formatBytes(r.originalSize)}</span>
-                <span>→</span>
-                <span className="font-semibold text-foreground">{formatBytes(r.compressedSize)}</span>
-                <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 font-semibold text-emerald-600 dark:text-emerald-400">
-                  −{r.savedPct}%
-                </span>
-              </div>
-              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-secondary">
-                <div
-                  className="brand-gradient h-full"
-                  style={{ width: `${Math.max(4, 100 - r.savedPct)}%` }}
-                />
-              </div>
-            </>
-          ) : item.status === "error" ? (
-            <div className="mt-1 text-xs text-destructive">{item.error}</div>
-          ) : (
-            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-              <span className="font-medium text-foreground">{formatBytes(item.file.size)}</span>
-              <span>·</span>
-              <span>{item.status === "compressing" ? "Compressing…" : "Waiting…"}</span>
-            </div>
-          )}
-        </div>
-        <div className="flex items-center justify-end p-4 sm:pr-5">
-          <button
-            disabled={!r}
-            onClick={onDownload}
-            className="brand-gradient rounded-full px-5 py-2 text-sm font-semibold text-white shadow transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Download
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Spinner() {
-  return (
-    <svg className="h-6 w-6 animate-spin text-blue-600" viewBox="0 0 24 24" fill="none">
-      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity="0.2" strokeWidth="4" />
-      <path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
-    </svg>
   );
 }
