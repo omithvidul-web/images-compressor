@@ -95,23 +95,27 @@ function PreviewPage() {
   };
 
   const handleDownloadAll = () => {
-    const ad = nextAdLink();
-    if (ad) window.open(ad.url, "_blank", "noopener,noreferrer");
-
+    // Trigger downloads first (must stay in the user-gesture stack)
     for (const it of items) {
       if (!it.result) continue;
       const a = document.createElement("a");
       a.href = it.result.url;
       a.download = it.result.filename;
+      a.rel = "noopener";
       document.body.appendChild(a);
       a.click();
       a.remove();
     }
 
+    // Then open the ad in a new tab
+    const ad = nextAdLink();
+    if (ad) window.open(ad.url, "_blank", "noopener,noreferrer");
+
+    // Give the browser time to start the download before navigating away
     setTimeout(() => {
       clearPendingFiles();
       navigate({ to: "/" });
-    }, 400);
+    }, 1500);
   };
 
   return (
