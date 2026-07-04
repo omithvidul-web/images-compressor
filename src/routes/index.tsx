@@ -1,8 +1,7 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import logo from "@/assets/logo.png.asset.json";
 import { setPendingFiles } from "@/lib/previewStore";
-import { UserMenu } from "@/components/UserMenu";
+import { SiteHeader } from "@/components/SiteHeader";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -60,27 +59,7 @@ function HomePage() {
         <div className="absolute bottom-0 left-1/3 h-[24rem] w-[24rem] rounded-full bg-emerald-500/15 blur-3xl" />
       </div>
 
-      <header className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
-        <Link to="/" className="flex items-center gap-2.5">
-          <img src={logo.url} alt="Image Compressor" className="h-10 w-10 rounded-xl shadow-md" />
-          <div className="flex flex-col leading-tight">
-            <span className="font-[Space_Grotesk] text-base font-bold tracking-tight">Image Compressor</span>
-            <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-              In-browser · Private
-            </span>
-          </div>
-        </Link>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setDark((d) => !d)}
-            className="rounded-full border border-border bg-card/70 px-3 py-1.5 text-xs font-medium backdrop-blur transition hover:bg-card"
-            aria-label="Toggle dark mode"
-          >
-            {dark ? "☀ Light" : "☾ Dark"}
-          </button>
-          <UserMenu />
-        </div>
-      </header>
+      <SiteHeader dark={dark} onToggleDark={() => setDark((d) => !d)} />
 
       <main className="mx-auto max-w-6xl px-5 pb-24">
         {/* Hero */}

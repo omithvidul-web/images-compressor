@@ -7,6 +7,22 @@ import {
   saveLinks,
   saveSettings,
 } from "@/lib/ads";
+import {
+  DEFAULT_PAGES,
+  getAdSense,
+  getAdsterra,
+  getAllPages,
+  getMenu,
+  saveAdSense,
+  saveAdsterra,
+  saveMenu,
+  savePage,
+  type AdSenseUnit,
+  type AdsterraUnit,
+  type MenuItem,
+  type PageContent,
+  type PageKey,
+} from "@/lib/cms";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({ meta: [{ title: "Admin · Image Compressor" }, { name: "robots", content: "noindex" }] }),
@@ -57,188 +73,593 @@ function AdminPage() {
   return <Dashboard onLogout={signOut} />;
 }
 
+type Tab = "adsterra-links" | "menu" | "pages" | "adsense" | "adsterra";
+
 function Dashboard({ onLogout }: { onLogout: () => void }) {
-  const [links, setLinks] = useState<AdLink[]>([]);
-  const [settings, setSettings] = useState(getSettings());
-  const [label, setLabel] = useState("");
-  const [url, setUrl] = useState("");
-
-  useEffect(() => {
-    setLinks(getLinks());
-  }, []);
-
-  const persistLinks = (next: AdLink[]) => {
-    setLinks(next);
-    saveLinks(next);
-  };
-
-  const persistSettings = (next: typeof settings) => {
-    setSettings(next);
-    saveSettings(next);
-  };
-
-  const addLink = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!url.trim()) return;
-    const next: AdLink[] = [
-      ...links,
-      { id: crypto.randomUUID(), label: label.trim() || "Adsterra link", url: url.trim(), active: true },
-    ];
-    persistLinks(next);
-    setLabel("");
-    setUrl("");
-  };
-
-  const updateLink = (id: string, patch: Partial<AdLink>) => {
-    persistLinks(links.map((l) => (l.id === id ? { ...l, ...patch } : l)));
-  };
-
-  const removeLink = (id: string) => persistLinks(links.filter((l) => l.id !== id));
+  const [tab, setTab] = useState<Tab>("menu");
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <header className="mx-auto flex max-w-4xl items-center justify-between px-5 py-4">
+      <header className="mx-auto flex max-w-5xl items-center justify-between px-5 py-4">
         <Link to="/" className="text-sm font-semibold">← Image Compressor</Link>
         <button onClick={onLogout} className="text-xs text-muted-foreground hover:text-foreground">
           Sign out
         </button>
       </header>
 
-      <main className="mx-auto max-w-4xl space-y-6 px-5 pb-20">
+      <main className="mx-auto max-w-5xl space-y-6 px-5 pb-20">
         <div>
-          <h1 className="font-[Space_Grotesk] text-3xl font-bold">Admin</h1>
+          <h1 className="font-[Space_Grotesk] text-3xl font-bold">Admin Control Center</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Manage navigation, page content, and monetization.
+          </p>
         </div>
 
-        <section className="glass-card rounded-2xl p-5">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-            Global settings
-          </h2>
-          <div className="mt-4 space-y-4">
-            <Toggle
-              label="Ads enabled"
-              hint="When off, downloads skip the redirect entirely."
-              checked={settings.enabled}
-              onChange={(v) => persistSettings({ ...settings, enabled: v })}
-            />
-            <div>
-              <div className="text-sm font-medium">Redirect behavior</div>
-              <div className="mt-2 inline-flex rounded-full bg-secondary p-1 text-xs font-semibold">
-                {(["new-tab", "same-tab"] as const).map((mode) => (
+        <div className="flex flex-wrap gap-2">
+          {(
+            [
+              ["menu", "Navigation"],
+              ["pages", "Pages"],
+              ["adsense", "AdSense"],
+              ["adsterra", "Adsterra"],
+              ["adsterra-links", "Redirect Links"],
+            ] as [Tab, string][]
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                tab === id
+                  ? "brand-gradient text-white shadow"
+                  : "border border-border bg-card/70 text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {tab === "menu" && <MenuManager />}
+        {tab === "pages" && <PagesManager />}
+        {tab === "adsense" && <AdSenseManager />}
+        {tab === "adsterra" && <AdsterraManager />}
+        {tab === "adsterra-links" && <LegacyAdLinks />}
+      </main>
+    </div>
+  );
+}
+
+// ------- Menu Manager -------
+
+function MenuManager() {
+  const [items, setItems] = useState<MenuItem[]>([]);
+  const [title, setTitle] = useState("");
+  const [route, setRoute] = useState("");
+
+  useEffect(() => setItems(getMenu()), []);
+
+  const persist = (next: MenuItem[]) => {
+    const ordered = next.map((it, i) => ({ ...it, order: i }));
+    setItems(ordered);
+    saveMenu(ordered);
+  };
+
+  const add = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim() || !route.trim()) return;
+    persist([
+      ...items,
+      {
+        id: crypto.randomUUID(),
+        title: title.trim(),
+        route: route.trim().startsWith("/") ? route.trim() : `/${route.trim()}`,
+        enabled: true,
+        order: items.length,
+      },
+    ]);
+    setTitle("");
+    setRoute("");
+  };
+
+  const move = (i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    if (j < 0 || j >= items.length) return;
+    const next = [...items];
+    [next[i], next[j]] = [next[j], next[i]];
+    persist(next);
+  };
+
+  return (
+    <>
+      <Section title="Add menu item">
+        <form onSubmit={add} className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
+          <Input placeholder="Title (e.g. Blog)" value={title} onChange={setTitle} />
+          <Input placeholder="Route (e.g. /blog)" value={route} onChange={setRoute} />
+          <button className="brand-gradient rounded-xl px-4 py-2.5 text-sm font-semibold text-white">
+            Add
+          </button>
+        </form>
+      </Section>
+
+      <Section title={`Menu items (${items.length})`}>
+        <div className="space-y-2">
+          {items.map((m, i) => (
+            <div key={m.id} className="rounded-xl border border-border bg-card/60 p-3">
+              <div className="grid gap-2 sm:grid-cols-[auto_1fr_1fr_auto_auto_auto] sm:items-center">
+                <div className="flex flex-col">
                   <button
-                    key={mode}
-                    onClick={() => persistSettings({ ...settings, redirectMode: mode })}
-                    className={`rounded-full px-4 py-1.5 transition ${
-                      settings.redirectMode === mode ? "brand-gradient text-white" : "text-muted-foreground"
-                    }`}
+                    onClick={() => move(i, -1)}
+                    className="px-2 text-xs text-muted-foreground hover:text-foreground"
                   >
-                    {mode === "new-tab" ? "Open ad in new tab" : "Same tab"}
+                    ▲
                   </button>
-                ))}
+                  <button
+                    onClick={() => move(i, 1)}
+                    className="px-2 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    ▼
+                  </button>
+                </div>
+                <input
+                  value={m.title}
+                  onChange={(e) => persist(items.map((x) => (x.id === m.id ? { ...x, title: e.target.value } : x)))}
+                  className="rounded-lg bg-transparent px-2 py-1.5 text-sm font-medium outline-none focus:bg-secondary"
+                />
+                <input
+                  value={m.route}
+                  onChange={(e) => persist(items.map((x) => (x.id === m.id ? { ...x, route: e.target.value } : x)))}
+                  className="rounded-lg bg-transparent px-2 py-1.5 text-xs text-muted-foreground outline-none focus:bg-secondary"
+                />
+                <SmallToggle
+                  checked={m.enabled}
+                  onChange={(v) => persist(items.map((x) => (x.id === m.id ? { ...x, enabled: v } : x)))}
+                />
+                <button
+                  onClick={() => persist(items.filter((x) => x.id !== m.id))}
+                  className="rounded-lg px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10"
+                >
+                  Delete
+                </button>
               </div>
             </div>
-          </div>
-        </section>
+          ))}
+        </div>
+      </Section>
+    </>
+  );
+}
 
-        <section className="glass-card rounded-2xl p-5">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-            Add Adsterra link
-          </h2>
-          <form onSubmit={addLink} className="mt-4 grid gap-3 sm:grid-cols-[1fr_2fr_auto]">
-            <input
-              placeholder="Label (optional)"
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              className="rounded-xl border border-border bg-card px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500/60"
-            />
-            <input
-              placeholder="https://…"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              className="rounded-xl border border-border bg-card px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500/60"
-            />
-            <button className="brand-gradient rounded-xl px-4 py-2.5 text-sm font-semibold text-white">
-              Add
-            </button>
-          </form>
-        </section>
+// ------- Pages Manager -------
 
-        <section className="glass-card rounded-2xl p-5">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-            Links ({links.length})
-          </h2>
-          <div className="mt-4 space-y-2">
-            {links.length === 0 && (
-              <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-                No links yet. Add one above.
-              </div>
-            )}
-            {links.map((l) => (
-              <div key={l.id} className="rounded-xl border border-border bg-card/60 p-3">
-                <div className="grid gap-2 sm:grid-cols-[1fr_2fr_auto_auto] sm:items-center">
-                  <input
-                    value={l.label}
-                    onChange={(e) => updateLink(l.id, { label: e.target.value })}
-                    className="rounded-lg bg-transparent px-2 py-1.5 text-sm font-medium outline-none focus:bg-secondary"
-                  />
-                  <input
-                    value={l.url}
-                    onChange={(e) => updateLink(l.id, { url: e.target.value })}
-                    className="truncate rounded-lg bg-transparent px-2 py-1.5 text-xs text-muted-foreground outline-none focus:bg-secondary"
-                  />
-                  <Toggle
-                    compact
-                    checked={l.active}
-                    onChange={(v) => updateLink(l.id, { active: v })}
+const PAGE_KEYS: PageKey[] = ["home", "about", "contact", "privacy", "terms"];
+
+function PagesManager() {
+  const [pages, setPages] = useState<Record<PageKey, PageContent>>(DEFAULT_PAGES);
+  const [active, setActive] = useState<PageKey>("about");
+
+  useEffect(() => setPages(getAllPages()), []);
+
+  const update = (patch: Partial<PageContent>) => {
+    const next = { ...pages, [active]: { ...pages[active], ...patch } };
+    setPages(next);
+    savePage(active, next[active]);
+  };
+
+  const p = pages[active];
+
+  return (
+    <Section title="Edit page content">
+      <div className="mb-4 flex flex-wrap gap-2">
+        {PAGE_KEYS.map((k) => (
+          <button
+            key={k}
+            onClick={() => setActive(k)}
+            className={`rounded-full px-3 py-1.5 text-xs font-semibold capitalize transition ${
+              active === k
+                ? "bg-foreground text-background"
+                : "border border-border bg-card/60 text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {k}
+          </button>
+        ))}
+      </div>
+      <div className="space-y-3">
+        <Field label="Title">
+          <Input value={p.title} onChange={(v) => update({ title: v })} />
+        </Field>
+        <Field label="Subtitle">
+          <Input value={p.subtitle ?? ""} onChange={(v) => update({ subtitle: v })} />
+        </Field>
+        <Field label="Body (blank lines separate paragraphs)">
+          <textarea
+            value={p.body}
+            onChange={(e) => update({ body: e.target.value })}
+            rows={12}
+            className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500/60"
+          />
+        </Field>
+        <p className="text-xs text-muted-foreground">Saved automatically to this device.</p>
+      </div>
+    </Section>
+  );
+}
+
+// ------- AdSense Manager -------
+
+function AdSenseManager() {
+  const [units, setUnits] = useState<AdSenseUnit[]>([]);
+  const [draft, setDraft] = useState<AdSenseUnit>(newAdSense());
+
+  useEffect(() => setUnits(getAdSense()), []);
+
+  const persist = (next: AdSenseUnit[]) => {
+    setUnits(next);
+    saveAdSense(next);
+  };
+
+  const add = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!draft.name.trim() || !draft.slot.trim() || !draft.client.trim()) return;
+    persist([...units, { ...draft, id: crypto.randomUUID() }]);
+    setDraft(newAdSense());
+  };
+
+  return (
+    <>
+      <Section title="Add AdSense unit">
+        <form onSubmit={add} className="grid gap-3 sm:grid-cols-2">
+          <Input placeholder="Ad Unit Name" value={draft.name} onChange={(v) => setDraft({ ...draft, name: v })} />
+          <Select
+            value={draft.type}
+            onChange={(v) => setDraft({ ...draft, type: v as AdSenseUnit["type"] })}
+            options={[
+              ["display", "Display Banner"],
+              ["responsive", "Responsive"],
+              ["in-article", "In-Article"],
+              ["in-feed", "In-Feed"],
+            ]}
+          />
+          <Input placeholder="Client ID (ca-pub-…)" value={draft.client} onChange={(v) => setDraft({ ...draft, client: v })} />
+          <Input placeholder="Slot ID" value={draft.slot} onChange={(v) => setDraft({ ...draft, slot: v })} />
+          <Select
+            value={draft.location}
+            onChange={(v) => setDraft({ ...draft, location: v as AdSenseUnit["location"] })}
+            options={[
+              ["header", "Header"],
+              ["sidebar", "Sidebar"],
+              ["in-content", "In Content"],
+              ["footer", "Footer"],
+            ]}
+          />
+          <button className="brand-gradient rounded-xl px-4 py-2.5 text-sm font-semibold text-white sm:col-span-2">
+            Add ad unit
+          </button>
+        </form>
+      </Section>
+
+      <Section title={`AdSense units (${units.length})`}>
+        {units.length === 0 && <EmptyHint text="No AdSense units yet." />}
+        <div className="space-y-2">
+          {units.map((u) => (
+            <div key={u.id} className="rounded-xl border border-border bg-card/60 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold">{u.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {u.type} · {u.location} · {u.client} / {u.slot}
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <SmallToggle
+                    checked={u.enabled}
+                    onChange={(v) => persist(units.map((x) => (x.id === u.id ? { ...x, enabled: v } : x)))}
                   />
                   <button
-                    onClick={() => removeLink(l.id)}
+                    onClick={() => persist(units.filter((x) => x.id !== u.id))}
                     className="rounded-lg px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10"
                   >
                     Delete
                   </button>
                 </div>
               </div>
-            ))}
-          </div>
-        </section>
-      </main>
-    </div>
+            </div>
+          ))}
+        </div>
+      </Section>
+    </>
   );
 }
 
-function Toggle({
-  label,
-  hint,
-  checked,
+function newAdSense(): AdSenseUnit {
+  return {
+    id: "",
+    name: "",
+    type: "responsive",
+    client: "",
+    slot: "",
+    location: "in-content",
+    enabled: true,
+  };
+}
+
+// ------- Adsterra Manager -------
+
+function AdsterraManager() {
+  const [units, setUnits] = useState<AdsterraUnit[]>([]);
+  const [draft, setDraft] = useState<AdsterraUnit>(newAdsterra());
+
+  useEffect(() => setUnits(getAdsterra()), []);
+
+  const persist = (next: AdsterraUnit[]) => {
+    setUnits(next);
+    saveAdsterra(next);
+  };
+
+  const add = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!draft.name.trim() || !draft.code.trim()) return;
+    persist([...units, { ...draft, id: crypto.randomUUID() }]);
+    setDraft(newAdsterra());
+  };
+
+  return (
+    <>
+      <Section title="Add Adsterra unit">
+        <form onSubmit={add} className="grid gap-3 sm:grid-cols-2">
+          <Input placeholder="Name" value={draft.name} onChange={(v) => setDraft({ ...draft, name: v })} />
+          <Select
+            value={draft.type}
+            onChange={(v) => setDraft({ ...draft, type: v as AdsterraUnit["type"] })}
+            options={[
+              ["popunder", "Popunder"],
+              ["social-bar", "Social Bar"],
+              ["native-banner", "Native Banner"],
+              ["direct-link", "Direct Link"],
+            ]}
+          />
+          <div className="sm:col-span-2">
+            <textarea
+              placeholder={draft.type === "direct-link" || draft.type === "popunder" ? "URL or script" : "Ad script / code"}
+              value={draft.code}
+              onChange={(e) => setDraft({ ...draft, code: e.target.value })}
+              rows={3}
+              className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500/60"
+            />
+          </div>
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            Cooldown (sec)
+            <input
+              type="number"
+              min={0}
+              value={draft.cooldownSec}
+              onChange={(e) => setDraft({ ...draft, cooldownSec: Number(e.target.value) || 0 })}
+              className="w-24 rounded-lg border border-border bg-card px-2 py-1 text-sm"
+            />
+          </label>
+          <button className="brand-gradient rounded-xl px-4 py-2.5 text-sm font-semibold text-white sm:col-span-2">
+            Add
+          </button>
+        </form>
+      </Section>
+
+      <Section title={`Adsterra units (${units.length})`}>
+        {units.length === 0 && <EmptyHint text="No Adsterra units yet." />}
+        <div className="space-y-2">
+          {units.map((u) => (
+            <div key={u.id} className="rounded-xl border border-border bg-card/60 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold">{u.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {u.type} · cooldown {u.cooldownSec}s
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <SmallToggle
+                    checked={u.enabled}
+                    onChange={(v) => persist(units.map((x) => (x.id === u.id ? { ...x, enabled: v } : x)))}
+                  />
+                  <button
+                    onClick={() => persist(units.filter((x) => x.id !== u.id))}
+                    className="rounded-lg px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Section>
+    </>
+  );
+}
+
+function newAdsterra(): AdsterraUnit {
+  return {
+    id: "",
+    name: "",
+    type: "popunder",
+    code: "",
+    enabled: true,
+    cooldownSec: 60,
+  };
+}
+
+// ------- Legacy download-redirect links -------
+
+function LegacyAdLinks() {
+  const [links, setLinks] = useState<AdLink[]>([]);
+  const [settings, setSettings] = useState(getSettings());
+  const [label, setLabel] = useState("");
+  const [url, setUrl] = useState("");
+
+  useEffect(() => setLinks(getLinks()), []);
+
+  const persist = (next: AdLink[]) => {
+    setLinks(next);
+    saveLinks(next);
+  };
+  const persistS = (next: typeof settings) => {
+    setSettings(next);
+    saveSettings(next);
+  };
+
+  const add = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!url.trim()) return;
+    persist([
+      ...links,
+      { id: crypto.randomUUID(), label: label.trim() || "Redirect link", url: url.trim(), active: true },
+    ]);
+    setLabel("");
+    setUrl("");
+  };
+
+  return (
+    <>
+      <Section title="Download redirect settings">
+        <div className="space-y-3">
+          <label className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-medium">Redirect enabled</div>
+              <div className="text-xs text-muted-foreground">When off, downloads skip the redirect.</div>
+            </div>
+            <SmallToggle checked={settings.enabled} onChange={(v) => persistS({ ...settings, enabled: v })} />
+          </label>
+        </div>
+      </Section>
+
+      <Section title="Add link">
+        <form onSubmit={add} className="grid gap-3 sm:grid-cols-[1fr_2fr_auto]">
+          <Input placeholder="Label (optional)" value={label} onChange={setLabel} />
+          <Input placeholder="https://…" value={url} onChange={setUrl} />
+          <button className="brand-gradient rounded-xl px-4 py-2.5 text-sm font-semibold text-white">Add</button>
+        </form>
+      </Section>
+
+      <Section title={`Links (${links.length})`}>
+        {links.length === 0 && <EmptyHint text="No links yet." />}
+        <div className="space-y-2">
+          {links.map((l) => (
+            <div key={l.id} className="rounded-xl border border-border bg-card/60 p-3">
+              <div className="grid gap-2 sm:grid-cols-[1fr_2fr_auto_auto] sm:items-center">
+                <input
+                  value={l.label}
+                  onChange={(e) => persist(links.map((x) => (x.id === l.id ? { ...x, label: e.target.value } : x)))}
+                  className="rounded-lg bg-transparent px-2 py-1.5 text-sm font-medium outline-none focus:bg-secondary"
+                />
+                <input
+                  value={l.url}
+                  onChange={(e) => persist(links.map((x) => (x.id === l.id ? { ...x, url: e.target.value } : x)))}
+                  className="truncate rounded-lg bg-transparent px-2 py-1.5 text-xs text-muted-foreground outline-none focus:bg-secondary"
+                />
+                <SmallToggle
+                  checked={l.active}
+                  onChange={(v) => persist(links.map((x) => (x.id === l.id ? { ...x, active: v } : x)))}
+                />
+                <button
+                  onClick={() => persist(links.filter((x) => x.id !== l.id))}
+                  className="rounded-lg px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Section>
+    </>
+  );
+}
+
+// ------- Small UI helpers -------
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="glass-card rounded-2xl p-5">
+      <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">{title}</h2>
+      {children}
+    </section>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</div>
+      {children}
+    </label>
+  );
+}
+
+function Input({
+  value,
   onChange,
-  compact,
+  placeholder,
 }: {
-  label?: string;
-  hint?: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  compact?: boolean;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
 }) {
   return (
-    <label className={`flex items-center ${compact ? "justify-center" : "justify-between"} gap-3 cursor-pointer`}>
-      {label && (
-        <div>
-          <div className="text-sm font-medium">{label}</div>
-          {hint && <div className="text-xs text-muted-foreground">{hint}</div>}
-        </div>
-      )}
+    <input
+      value={value}
+      placeholder={placeholder}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500/60"
+    />
+  );
+}
+
+function Select({
+  value,
+  onChange,
+  options,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: [string, string][];
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500/60"
+    >
+      {options.map(([v, l]) => (
+        <option key={v} value={v}>
+          {l}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function SmallToggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
+        checked ? "brand-gradient" : "bg-secondary"
+      }`}
+      aria-pressed={checked}
+    >
       <span
-        onClick={() => onChange(!checked)}
-        className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
-          checked ? "brand-gradient" : "bg-secondary"
+        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
+          checked ? "translate-x-5" : "translate-x-0.5"
         }`}
-      >
-        <span
-          className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
-            checked ? "translate-x-5" : "translate-x-0.5"
-          }`}
-        />
-      </span>
-    </label>
+      />
+    </button>
+  );
+}
+
+function EmptyHint({ text }: { text: string }) {
+  return (
+    <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+      {text}
+    </div>
   );
 }
