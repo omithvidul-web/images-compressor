@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import logo from "@/assets/logo.png.asset.json";
+import { logoDataUri } from "@/lib/logo";
 import {
   clearPendingFiles,
   getPendingFiles,
@@ -127,7 +127,7 @@ function PreviewPage() {
 
       <header className="mx-auto flex max-w-4xl items-center justify-between px-5 py-4">
         <Link to="/" className="flex items-center gap-2.5">
-          <img src={logo.url} alt="Image Compressor" className="h-10 w-10 rounded-xl shadow-md" />
+          <img src={logoDataUri} alt="Image Compressor" className="h-10 w-10 rounded-xl shadow-md" />
           <span className="font-[Space_Grotesk] text-base font-bold tracking-tight">
             Image Compressor
           </span>
