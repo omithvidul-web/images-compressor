@@ -1,7 +1,7 @@
 import { Link, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { getMenu, type MenuItem } from "@/lib/cms";
-import logo from "@/assets/logo.png.asset.json";
+import { logoDataUri } from "@/lib/logo";
 import { UserMenu } from "@/components/UserMenu";
 
 export function SiteHeader({ dark, onToggleDark }: { dark?: boolean; onToggleDark?: () => void }) {
@@ -46,7 +46,7 @@ export function SiteHeader({ dark, onToggleDark }: { dark?: boolean; onToggleDar
         </button>
 
         <Link to="/" className="flex min-w-0 items-center gap-2">
-          <img src={logo.url} alt="Image Compressor" className="h-9 w-9 shrink-0 rounded-xl shadow" />
+          <img src={logoDataUri} alt="Image Compressor" className="h-9 w-9 shrink-0 rounded-xl shadow" />
           <span className="truncate font-[Space_Grotesk] text-base font-bold tracking-tight sm:text-lg">
             Image Compressor
           </span>
@@ -87,7 +87,7 @@ export function SiteHeader({ dark, onToggleDark }: { dark?: boolean; onToggleDar
       >
         <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
           <div className="flex items-center gap-2.5">
-            <img src={logo.url} alt="" className="h-8 w-8 rounded-lg" />
+            <img src={logoDataUri} alt="" className="h-8 w-8 rounded-lg" />
             <span className="font-[Space_Grotesk] font-bold">Menu</span>
           </div>
           <button
