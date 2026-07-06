@@ -14,7 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      admob_config: {
+        Row: {
+          app_id: string
+          app_open_id: string
+          banner_id: string
+          created_at: string
+          id: string
+          interstitial_id: string
+          is_active: boolean
+          native_id: string
+          publisher_id: string
+          rewarded_id: string
+          rewarded_interstitial_id: string
+          singleton: boolean
+          updated_at: string
+        }
+        Insert: {
+          app_id?: string
+          app_open_id?: string
+          banner_id?: string
+          created_at?: string
+          id?: string
+          interstitial_id?: string
+          is_active?: boolean
+          native_id?: string
+          publisher_id?: string
+          rewarded_id?: string
+          rewarded_interstitial_id?: string
+          singleton?: boolean
+          updated_at?: string
+        }
+        Update: {
+          app_id?: string
+          app_open_id?: string
+          banner_id?: string
+          created_at?: string
+          id?: string
+          interstitial_id?: string
+          is_active?: boolean
+          native_id?: string
+          publisher_id?: string
+          rewarded_id?: string
+          rewarded_interstitial_id?: string
+          singleton?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

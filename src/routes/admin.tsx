@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import {
   type AdLink,
   getLinks,
@@ -23,6 +24,14 @@ import {
   type PageContent,
   type PageKey,
 } from "@/lib/cms";
+import {
+  getAdmobConfig,
+  updateAdmobConfig,
+  verifyAdmobAdminSecret,
+  type AdmobConfig,
+} from "@/lib/admob.functions";
+
+const ADMOB_SECRET_KEY = "ic.admob.secret";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({ meta: [{ title: "Admin · Image Compressor" }, { name: "robots", content: "noindex" }] }),
@@ -73,7 +82,7 @@ function AdminPage() {
   return <Dashboard onLogout={signOut} />;
 }
 
-type Tab = "adsterra-links" | "menu" | "pages" | "adsense" | "adsterra";
+type Tab = "adsterra-links" | "menu" | "pages" | "adsense" | "adsterra" | "admob";
 
 function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [tab, setTab] = useState<Tab>("menu");
@@ -103,6 +112,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
               ["adsense", "AdSense"],
               ["adsterra", "Adsterra"],
               ["adsterra-links", "Redirect Links"],
+              ["admob", "Manage AdMob IDs"],
             ] as [Tab, string][]
           ).map(([id, label]) => (
             <button
@@ -124,8 +134,147 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         {tab === "adsense" && <AdSenseManager />}
         {tab === "adsterra" && <AdsterraManager />}
         {tab === "adsterra-links" && <LegacyAdLinks />}
+        {tab === "admob" && <AdmobManager />}
       </main>
     </div>
+  );
+}
+
+// ------- AdMob Manager (Android app config) -------
+
+const ADMOB_FIELDS: { key: keyof AdmobConfig; label: string; placeholder: string }[] = [
+  { key: "publisher_id", label: "AdMob Publisher ID", placeholder: "pub-XXXXXXXXXXXXXXXX" },
+  { key: "app_id", label: "AdMob App ID", placeholder: "ca-app-pub-XXXXXXXXXXXXXXXX~XXXXXXXXXX" },
+  { key: "app_open_id", label: "App Open Ad ID", placeholder: "ca-app-pub-…/…" },
+  { key: "banner_id", label: "Banner Ad ID", placeholder: "ca-app-pub-…/…" },
+  { key: "interstitial_id", label: "Interstitial Ad ID", placeholder: "ca-app-pub-…/…" },
+  { key: "rewarded_id", label: "Rewarded Ad ID", placeholder: "ca-app-pub-…/…" },
+  { key: "rewarded_interstitial_id", label: "Rewarded Interstitial Ad ID", placeholder: "ca-app-pub-…/…" },
+  { key: "native_id", label: "Native Advanced Ad ID", placeholder: "ca-app-pub-…/…" },
+];
+
+function AdmobManager() {
+  const fetchConfig = useServerFn(getAdmobConfig);
+  const saveConfig = useServerFn(updateAdmobConfig);
+  const verifySecret = useServerFn(verifyAdmobAdminSecret);
+
+  const [secret, setSecret] = useState("");
+  const [unlocked, setUnlocked] = useState(false);
+  const [config, setConfig] = useState<AdmobConfig | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    fetchConfig().then((c) => setConfig(c)).catch(() => setStatus("Could not load config."));
+    const cached = sessionStorage.getItem(ADMOB_SECRET_KEY);
+    if (cached) {
+      setSecret(cached);
+      verifySecret({ data: { secret: cached } })
+        .then((r) => setUnlocked(r.ok))
+        .catch(() => {});
+    }
+  }, [fetchConfig, verifySecret]);
+
+  const unlock = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setStatus(null);
+    try {
+      const { ok } = await verifySecret({ data: { secret } });
+      if (!ok) {
+        setStatus("Incorrect admin secret.");
+        return;
+      }
+      sessionStorage.setItem(ADMOB_SECRET_KEY, secret);
+      setUnlocked(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const save = async () => {
+    if (!config) return;
+    setBusy(true);
+    setStatus(null);
+    try {
+      const next = await saveConfig({ data: { secret, config } });
+      setConfig(next);
+      setStatus("Saved.");
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Save failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!unlocked) {
+    return (
+      <Section title="Unlock AdMob settings">
+        <p className="mb-4 text-sm text-muted-foreground">
+          Writes to the AdMob config are protected by a server-side admin secret
+          (<code className="rounded bg-secondary px-1">ADMOB_ADMIN_SECRET</code>).
+          Enter it once per session.
+        </p>
+        <form onSubmit={unlock} className="flex flex-col gap-3 sm:flex-row">
+          <input
+            type="password"
+            value={secret}
+            onChange={(e) => setSecret(e.target.value)}
+            placeholder="Admin secret"
+            className="flex-1 rounded-xl border border-border bg-card px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500/60"
+          />
+          <button
+            disabled={busy || !secret}
+            className="brand-gradient rounded-xl px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            {busy ? "Checking…" : "Unlock"}
+          </button>
+        </form>
+        {status && <p className="mt-3 text-sm text-destructive">{status}</p>}
+      </Section>
+    );
+  }
+
+  if (!config) {
+    return <Section title="Manage AdMob IDs"><EmptyHint text="Loading…" /></Section>;
+  }
+
+  return (
+    <Section title="Manage AdMob IDs">
+      <p className="mb-4 text-xs text-muted-foreground">
+        These IDs are served to the Android app from{" "}
+        <code className="rounded bg-secondary px-1">/api/public/admob-config</code>.
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {ADMOB_FIELDS.map((f) => (
+          <Field key={f.key} label={f.label}>
+            <Input
+              value={(config[f.key] as string) ?? ""}
+              placeholder={f.placeholder}
+              onChange={(v) => setConfig({ ...config, [f.key]: v })}
+            />
+          </Field>
+        ))}
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-4">
+        <label className="flex items-center gap-2 text-sm">
+          <SmallToggle
+            checked={config.is_active}
+            onChange={(v) => setConfig({ ...config, is_active: v })}
+          />
+          <span>Active (served to the app)</span>
+        </label>
+        <button
+          onClick={save}
+          disabled={busy}
+          className="brand-gradient ml-auto rounded-xl px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          {busy ? "Saving…" : "Save changes"}
+        </button>
+      </div>
+      {status && <p className="mt-3 text-sm text-muted-foreground">{status}</p>}
+    </Section>
   );
 }
 
