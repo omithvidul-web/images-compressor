@@ -8,6 +8,7 @@ import {
 } from "@/lib/previewStore";
 import { compressImage, formatBytes, type CompressResult } from "@/lib/compress";
 import { nextAdLink } from "@/lib/ads";
+import { ADSTERRA_DIRECT_LINK } from "@/components/AdsterraAds";
 
 export const Route = createFileRoute("/preview")({
   head: () => ({
@@ -109,7 +110,7 @@ function PreviewPage() {
 
     // Then open the ad in a new tab
     const ad = nextAdLink();
-    if (ad) window.open(ad.url, "_blank", "noopener,noreferrer");
+    window.open(ad?.url ?? ADSTERRA_DIRECT_LINK, "_blank", "noopener,noreferrer");
 
     // Give the browser time to start the download before navigating away
     setTimeout(() => {
