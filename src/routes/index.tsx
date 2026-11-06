@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { setPendingFiles } from "@/lib/previewStore";
 import { SiteHeader } from "@/components/SiteHeader";
+import { AdsterraBanner320, AdsterraNativeBanner } from "@/components/AdsterraAds";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -120,6 +121,8 @@ function HomePage() {
           </div>
         </section>
 
+        <AdsterraBanner320 className="mt-6" />
+
         {/* Features strip */}
         <section className="mt-16 grid gap-4 sm:grid-cols-3">
           {[
@@ -134,6 +137,7 @@ function HomePage() {
             </div>
           ))}
         </section>
+        <AdsterraNativeBanner className="mt-10" />
       </main>
 
       <footer className="border-t border-border/60 py-6 text-center text-xs text-muted-foreground">
