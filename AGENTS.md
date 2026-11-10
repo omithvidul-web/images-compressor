@@ -8,3 +8,5 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+- Serve crawler-facing favicons as real square files in `public/`, while keeping in-page logo embedding unchanged; crawlers need stable directly accessible image URLs.
