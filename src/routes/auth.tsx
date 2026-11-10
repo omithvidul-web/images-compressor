@@ -3,7 +3,7 @@ import { useState } from "react";
 import { getAdminEmail, getAdminPassword, setAdminPassword } from "@/lib/ads";
 
 export const Route = createFileRoute("/auth")({
-  head: () => ({ meta: [{ title: "Sign in · Image Compressor" }] }),
+  head: () => ({ meta: [{ title: "Sign in · Image Compressor" }, { name: "description", content: "Sign in to Image Compressor." }, { property: "og:title", content: "Sign in · Image Compressor" }, { property: "og:description", content: "Sign in to Image Compressor." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   component: AuthPage,
 });
 

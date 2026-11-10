@@ -15,6 +15,11 @@ export const Route = createFileRoute("/preview")({
     meta: [
       { title: "Preview compressed image — Image Compressor" },
       { name: "robots", content: "noindex" },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+      { name: "description", content: "Review and download your compressed images with Image Compressor." },
+      { property: "og:title", content: "Preview compressed image — Image Compressor" },
+      { property: "og:description", content: "Review and download your compressed images with Image Compressor." },
     ],
   }),
   component: PreviewPage,

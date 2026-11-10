@@ -10,6 +10,8 @@ export const Route = createFileRoute("/privacy")({
       { name: "description", content: "How Image Compressor handles your data. All image processing happens in-browser." },
       { property: "og:title", content: "Privacy Policy — Image Compressor" },
       { property: "og:description", content: "How Image Compressor handles your data. All image processing happens in-browser." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: PrivacyPage,
