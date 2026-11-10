@@ -13,6 +13,10 @@ export const Route = createFileRoute("/")({
         content:
           "Free online image compressor. Reduce JPG, PNG and WEBP file size in seconds — runs 100% in your browser, no upload required.",
       },
+      {
+  name: "google-site-verification",
+  content: "JSVoM6yfZQxJ_5e1CzOdIvzxV_KqWbQOmIyUTCeCQ9s"
+},
       { property: "og:title", content: "Image Compressor — Shrink JPG, PNG, WEBP in your browser" },
       {
         property: "og:description",
