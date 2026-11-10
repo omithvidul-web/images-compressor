@@ -10,6 +10,8 @@ export const Route = createFileRoute("/about")({
       { name: "description", content: "About Image Compressor — a fast, private, in-browser image optimization tool." },
       { property: "og:title", content: "About — Image Compressor" },
       { property: "og:description", content: "About Image Compressor — a fast, private, in-browser image optimization tool." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: AboutPage,

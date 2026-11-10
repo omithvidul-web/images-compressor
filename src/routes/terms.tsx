@@ -10,6 +10,8 @@ export const Route = createFileRoute("/terms")({
       { name: "description", content: "Terms of service for using Image Compressor." },
       { property: "og:title", content: "Terms of Service — Image Compressor" },
       { property: "og:description", content: "Terms of service for using Image Compressor." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: TermsPage,

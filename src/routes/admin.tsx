@@ -34,7 +34,7 @@ import {
 const ADMOB_SECRET_KEY = "ic.admob.secret";
 
 export const Route = createFileRoute("/admin")({
-  head: () => ({ meta: [{ title: "Admin · Image Compressor" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Admin · Image Compressor" }, { name: "description", content: "Manage Image Compressor settings and advertising." }, { property: "og:title", content: "Admin · Image Compressor" }, { property: "og:description", content: "Manage Image Compressor settings and advertising." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }, { name: "robots", content: "noindex" }] }),
   component: AdminPage,
 });
 
